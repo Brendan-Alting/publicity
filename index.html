@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Publicity</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    #map {
+  height: 600px;
+  width: 100%;
+  border: 2px solid #ccc;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+    #counters {
+  margin: 10px 20px 10px auto;
+  padding: 15px 25px;
+  background: #f9f9f9;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  width: fit-content;
+  text-align: left;   
+}
+    #resetButton:disabled {
+  background: #ccc;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.person {
+  display: grid;
+  grid-template-columns: auto 40px; 
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+#counters span {
+  display: inline-block;
+  min-width: 50px;
+  text-align: center;
+  background: #e0e0e0;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+#counters .total {
+  font-size: 18px;
+  font-weight: bold;
+  background: #dff0d8;
+  padding: 5px 35px;
+  border-radius: 8px;
+  margin-top: 5px;
+}
+    </style>
+    </head>
+    <body>
+  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+    <div>
+      <h1>NSW Pub Checklist</h1>
+      <p style="margin-left: 20px;">how many ya been to?</p>
+    </div>
+    <div id="imageRow" style="display: flex; gap: 20px; align-items: center; margin-top: 30px; margin-left: 19px;">
+    <img src="Data/peace sign.jpg" style="height: 110px; border-radius: 8px;">
+    <img src="Data/KegTooheysOld.webp" style="height: 110px; border-radius: 8px;">
+    <img src="Data/backtoback.jpg" style="height: 110px; border-radius: 8px;">
+    <img src="Data/tooheys old beer.jpeg" style="height: 110px; border-radius: 8px;">
+    <img src="Data/69.jpg" style="height: 110px; border-radius: 8px;">
+  </div>
+    <div id="counters">
+      <div class="person">Jana <span id="countA">0</span></div>
+      <div class="person">Brendan <span id="countB">0</span></div>
+      <div class="person total">Total <span id="countTotal">0</span></div>
+      <button id="resetButton">Reset All</button>
+    </div>
+  </div>
+
+  <div style="display: flex; margin-top: 10px;">
+    <!-- LGA Sidebar -->
+    <div id="lgaTableContainer" style="flex: 0 0 280px; padding: 10px;">
+      <table id="lgaTable" border="1" cellpadding="5" style="border-collapse: collapse; width: 100%;">
+        <thead>
+          <tr>
+            <th>LGA</th>
+            <th>Jana</th>
+            <th>Brendan</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Map to the right -->
+    <div style="flex: 1; padding: 10px;">
+      <div id="map"></div>
+    </div>
+  </div>
+</body>
+  <script>
+let visited = JSON.parse(localStorage.getItem("visitedPubs")) || {};
+let countA = 0;
+let countB = 0;
+let countTotal = 0;
+let lgaStats = {};
+let totalPubs = 0;   // ✅ track overall total pubs
+
+// initialise counters if pubs already visited
+Object.values(visited).forEach(record => {
+  if (record.Jana) countA++;
+  if (record.Brendan) countB++;
+  if (record.Jana || record.Brendan) countTotal++;
+});
+
+// placeholder until pubs load
+document.getElementById("countA").innerText = countA;
+document.getElementById("countB").innerText = countB;
+document.getElementById("countTotal").innerText = countTotal;
+
+function toggleVisited(person, pubName, marker, checkbox) {
+  if (!visited[pubName]) {
+    visited[pubName] = { Jana: false, Brendan: false };
+  }
+
+  let newState = checkbox.checked;
+  let oldState = visited[pubName][person];
+  visited[pubName][person] = newState;
+
+  // update individual counts
+  if (newState && !oldState) {
+    if (person === 'Jana') countA++;
+    else countB++;
+  } else if (!newState && oldState) {
+    if (person === 'Jana') countA--;
+    else countB--;
+  }
+
+  // recalc total after state update
+  countTotal = Object.values(visited).filter(v => v.Jana || v.Brendan).length;
+
+  // recalc LGA stats for this pub’s LGA
+  let lga = window.markers[pubName].lga;
+  lgaStats[lga].Jana = 0;
+  lgaStats[lga].Brendan = 0;
+
+  for (let key in window.markers) {
+    let markerInfo = window.markers[key];
+    let v = visited[key];
+    if (!v) continue;
+    if (markerInfo.lga === lga) {
+      if (v.Jana) lgaStats[lga].Jana++;
+      if (v.Brendan) lgaStats[lga].Brendan++;
+    }
+  }
+
+  updateLgaTable();
+
+  // update UI with fractions
+  document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
+  document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
+  document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
+
+  // save + refresh marker
+  localStorage.setItem("visitedPubs", JSON.stringify(visited));
+  updateMarker(marker, pubName, window.markers[pubName].displayName);
+
+  updateResetButton();
+}
+
+var map = L.map('map');
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+function updateMarker(marker, pubName, displayName) {
+  let jana = visited[pubName]?.Jana;
+  let brendan = visited[pubName]?.Brendan;
+
+  let janaStatus = jana ? "✅ Jana" : "❌ Jana";
+  let brendanStatus = brendan ? "✅ Brendan" : "❌ Brendan";
+  marker.setTooltipContent(`${displayName}<br>${janaStatus} | ${brendanStatus}`);
+
+  let color = "black";
+  if (jana && brendan) color = "#00b300";       // both = green
+  else if (jana) color = "#4da6ff";             // Jana only
+  else if (brendan) color = "#ff6666";          // Brendan only
+
+  marker.setStyle({ color: color, fillColor: color });
+}
+
+function updateLgaTable() {
+  let tbody = document.querySelector("#lgaTable tbody");
+  tbody.innerHTML = "";
+
+  // sort LGAs by combined progress descending
+  let sorted = Object.entries(lgaStats).sort((a, b) => {
+    let totalA = a[1].Jana + a[1].Brendan;
+    let totalB = b[1].Jana + b[1].Brendan;
+    return totalB - totalA;
+  });
+
+  for (let [lga, stats] of sorted) {
+    let row = document.createElement("tr");
+
+    let cellLGA = document.createElement("td");
+    cellLGA.textContent = lga;
+
+    let cellJana = document.createElement("td");
+    cellJana.textContent = `${stats.Jana}/${stats.total}`;
+
+    let cellBrendan = document.createElement("td");
+    cellBrendan.textContent = `${stats.Brendan}/${stats.total}`;
+
+    row.appendChild(cellLGA);
+    row.appendChild(cellJana);
+    row.appendChild(cellBrendan);
+    tbody.appendChild(row);
+  }
+}
+
+function resetAll() {
+  if (confirm("Are you sure you want to clear all visited pubs?")) {
+    visited = {};
+    localStorage.removeItem("visitedPubs");
+
+    countA = 0;
+    countB = 0;
+    countTotal = 0;
+    document.getElementById("countA").innerText = `0/${totalPubs}`;
+    document.getElementById("countB").innerText = `0/${totalPubs}`;
+    document.getElementById("countTotal").innerText = `0/${totalPubs}`;
+
+    for (let pubName in window.markers) {
+      let { marker, displayName } = window.markers[pubName];
+      updateMarker(marker, pubName, displayName);
+    }
+
+    // reset all lga stats
+    for (let lga in lgaStats) {
+      lgaStats[lga].Jana = 0;
+      lgaStats[lga].Brendan = 0;
+    }
+    updateLgaTable();
+
+    updateResetButton();
+  }
+}
+
+function updateResetButton() {
+  const hasData = Object.keys(visited).length > 0 &&
+                  (countA > 0 || countB > 0);
+  document.getElementById("resetButton").disabled = !hasData;
+}
+
+let bounds = L.latLngBounds();
+
+fetch("Data/nsw_pubs.json")
+  .then(response => response.json())
+  .then(pubs => {
+    pubs.forEach(function(pub) {
+      let pubName = pub["Licence.name"];
+      let suburb = pub["Suburb"];
+      let lga = pub["LGA"].trim();
+      totalPubs++;   // ✅ count every pub
+
+      if (!lgaStats[lga]) {
+        lgaStats[lga] = { total: 0, Jana: 0, Brendan: 0 };
+      }
+      lgaStats[lga].total++;
+
+      let key = `${pubName}, ${suburb}`;
+      let displayName = key;
+
+      // count visited from saved state
+      if (visited[key]?.Jana) lgaStats[lga].Jana++;
+      if (visited[key]?.Brendan) lgaStats[lga].Brendan++;
+
+      let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
+        radius: 5,  // ✅ one size smaller
+        color: "black",
+        fillColor: "black",
+        fillOpacity: 0.8
+      }).addTo(map);
+      bounds.extend([pub.Latitude, pub.Longitude]);
+
+      marker.bindTooltip("", { permanent: false, direction: "top" });
+
+      marker.bindPopup("");  // empty placeholder
+
+marker.on("popupopen", () => {
+  let janaChecked = visited[key]?.Jana ? "checked" : "";
+  let brendanChecked = visited[key]?.Brendan ? "checked" : "";
+
+  let content = `
+    <b>${displayName}</b><br>
+    <label>
+      Jana <input type="checkbox" id="jana-${key}" ${janaChecked}>
+    </label><br>
+    <label>
+      Brendan <input type="checkbox" id="brendan-${key}" ${brendanChecked}>
+    </label>
+  `;
+  marker.getPopup().setContent(content);
+
+  // attach event listeners AFTER content is inserted
+  document.getElementById(`jana-${key}`).addEventListener("change", (e) => {
+    toggleVisited("Jana", key, marker, e.target);
+  });
+  document.getElementById(`brendan-${key}`).addEventListener("change", (e) => {
+    toggleVisited("Brendan", key, marker, e.target);
+  });
+});
+    });
+
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+
+    // update counters with fractions
+    document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
+    document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
+    document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
+
+    updateResetButton();
+    updateLgaTable();   // ✅ build table once at load
+  });
+
+document.getElementById("resetButton").addEventListener("click", resetAll);
+</script>
+</html>
