@@ -234,66 +234,77 @@
 
       // Load JSON + markers
       fetch("Data/nsw_pubs.json")
-        .then(response => response.json())
-        .then(pubs => {
-          pubs.forEach(function(pub) {
-            let pubName = pub["Licence.name"];
-            let suburb = pub["Suburb"];
-            let lga = pub["LGA"].trim();
-            totalPubs++;
+  .then(response => response.json())
+  .then(pubs => {
+    pubs.forEach(function(pub) {
+      let pubName = pub["Licence.name"];
+      let suburb = pub["Suburb"];
+      let lga = pub["LGA"].trim();
+      totalPubs++;
 
-            if (!lgaStats[lga]) {
-              lgaStats[lga] = { total: 0, Jana: 0, Brendan: 0 };
-            }
-            lgaStats[lga].total++;
+      if (!lgaStats[lga]) {
+        lgaStats[lga] = { total: 0, Jana: 0, Brendan: 0 };
+      }
+      lgaStats[lga].total++;
 
-            let key = `${pubName}, ${suburb}`;
-            let displayName = key;
+      let key = `${pubName}, ${suburb}`;
+      let displayName = key;
 
-            if (visited[key]?.Jana) lgaStats[lga].Jana++;
-            if (visited[key]?.Brendan) lgaStats[lga].Brendan++;
+      if (visited[key]?.Jana) lgaStats[lga].Jana++;
+      if (visited[key]?.Brendan) lgaStats[lga].Brendan++;
 
-            let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
-              radius: 5,
-              color: "black",
-              fillColor: "black",
-              fillOpacity: 0.8
-            }).addTo(map);
-            bounds.extend([pub.Latitude, pub.Longitude]);
+      // Helper to generate popup content based on current visited state
+      function getPopupContent() {
+        return `
+          <b>${displayName}</b><br>
+          <label>
+            Jana <input type="checkbox"
+              ${visited[key]?.Jana ? "checked" : ""}
+              onchange="toggleVisited('Jana', '${key}', window.markers['${key}'].marker, this)">
+          </label><br>
+          <label>
+            Brendan <input type="checkbox"
+              ${visited[key]?.Brendan ? "checked" : ""}
+              onchange="toggleVisited('Brendan', '${key}', window.markers['${key}'].marker, this)">
+          </label>
+        `;
+      }
 
-            marker.bindTooltip(displayName, { permanent: false, direction: "top" });
+      // Create marker
+      let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
+        radius: 5,
+        color: "black",
+        fillColor: "black",
+        fillOpacity: 0.8
+      }).addTo(map);
+      bounds.extend([pub.Latitude, pub.Longitude]);
 
-            // Escape key for safe inline use
-            let safeKey = encodeURIComponent(key);
+      marker.bindTooltip(displayName, { permanent: false, direction: "top" });
 
-            marker.bindPopup(`
-              <b>${displayName}</b><br>
-              <label>
-                Jana <input type="checkbox"
-                  ${visited[key]?.Jana ? "checked" : ""}
-                  onchange="toggleVisited('Jana', decodeURIComponent('${safeKey}'), window.markers[decodeURIComponent('${safeKey}')].marker, this)">
-              </label><br>
-              <label>
-                Brendan <input type="checkbox"
-                  ${visited[key]?.Brendan ? "checked" : ""}
-                  onchange="toggleVisited('Brendan', decodeURIComponent('${safeKey}'), window.markers[decodeURIComponent('${safeKey}')].marker, this)">
-              </label>
-            `);
+      // Bind popup (initial content)
+      marker.bindPopup(getPopupContent());
 
-            window.markers[key] = { marker, displayName, lga };
-            updateMarker(marker, key, displayName);
-          });
+      // 🔥 Regenerate popup content every time it opens
+      marker.on("popupopen", function(e) {
+        e.popup.setContent(getPopupContent());
+      });
 
-          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
-          map.invalidateSize();
+      // Save marker info
+      window.markers[key] = { marker, displayName, lga };
+      updateMarker(marker, key, displayName);
+    });
 
-          document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
-          document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
-          document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
+    // Fit map + initialise counters
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+    map.invalidateSize();
 
-          updateResetButton();
-          updateLgaTable();
-        });
+    document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
+    document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
+    document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
+
+    updateResetButton();
+    updateLgaTable();
+  });
 
       document.getElementById("resetButton").addEventListener("click", resetAll);
     </script>
