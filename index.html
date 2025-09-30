@@ -237,7 +237,7 @@
         .then(response => response.json())
         .then(pubs => {
           pubs.forEach(function(pub) {
-            let pubName = pub["Licence.name"];  // ⚠️ check field names in your JSON
+            let pubName = pub["Licence.name"];
             let suburb = pub["Suburb"];
             let lga = pub["LGA"].trim();
             totalPubs++;
@@ -263,17 +263,20 @@
 
             marker.bindTooltip(displayName, { permanent: false, direction: "top" });
 
+            // Escape key for safe inline use
+            let safeKey = encodeURIComponent(key);
+
             marker.bindPopup(`
               <b>${displayName}</b><br>
               <label>
                 Jana <input type="checkbox"
                   ${visited[key]?.Jana ? "checked" : ""}
-                  onchange="toggleVisited('Jana', '${key}', window.markers['${key}'].marker, this)">
+                  onchange="toggleVisited('Jana', decodeURIComponent('${safeKey}'), window.markers[decodeURIComponent('${safeKey}')].marker, this)">
               </label><br>
               <label>
                 Brendan <input type="checkbox"
                   ${visited[key]?.Brendan ? "checked" : ""}
-                  onchange="toggleVisited('Brendan', '${key}', window.markers['${key}'].marker, this)">
+                  onchange="toggleVisited('Brendan', decodeURIComponent('${safeKey}'), window.markers[decodeURIComponent('${safeKey}')].marker, this)">
               </label>
             `);
 
