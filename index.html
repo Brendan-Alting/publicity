@@ -61,6 +61,13 @@
       <div>
         <h1>NSW Pub Checklist</h1>
         <p style="margin-left: 20px;">how many ya been to?</p>
+        <div style="margin: 10px 20px; position: relative;">
+  <input id="searchBox" type="text" placeholder="Search pubs..." 
+         style="padding: 8px; width: 300px; border: 1px solid #ccc; border-radius: 6px;">
+  <div id="suggestions" 
+       style="background: white; border: 1px solid #ccc; max-height: 200px; overflow-y: auto; position: absolute; width: 300px; display:none; z-index:1000;">
+  </div>
+</div>
       </div>
       <div id="imageRow" style="display: flex; gap: 20px; align-items: center; margin-top: 30px; margin-left: 19px;">
         <img src="Data/peace sign.jpg" style="height: 110px; border-radius: 8px;">
@@ -231,7 +238,59 @@
         const hasData = Object.keys(visited).length > 0 && (countA > 0 || countB > 0);
         document.getElementById("resetButton").disabled = !hasData;
       }
+    const searchBox = document.getElementById("searchBox");
+    const suggestions = document.getElementById("suggestions");
+    let pubList = [];
 
+    function setupSearch() {
+      searchBox.addEventListener("input", function () {
+        const query = this.value.toLowerCase();
+        suggestions.innerHTML = "";
+    if (!query) {
+      suggestions.style.display = "none";
+      return;
+    }
+
+    // Find matches
+    const matches = pubList.filter(p =>
+      p.displayName.toLowerCase().includes(query)
+    ).slice(0, 10);
+
+    if (matches.length === 0) {
+      suggestions.style.display = "none";
+      return;
+    }
+
+    matches.forEach(match => {
+      const div = document.createElement("div");
+      div.textContent = match.displayName;
+      div.style.padding = "5px";
+      div.style.cursor = "pointer";
+      div.addEventListener("click", () => {
+        zoomToPub(match.key);
+        suggestions.style.display = "none";
+        searchBox.value = match.displayName;
+      });
+      div.addEventListener("mouseover", () => {
+        div.style.background = "#f0f0f0";
+      });
+      div.addEventListener("mouseout", () => {
+        div.style.background = "white";
+      });
+      suggestions.appendChild(div);
+    });
+
+    suggestions.style.display = "block";
+  });
+}
+
+    function zoomToPub(key) {
+      const markerInfo = window.markers[key];
+      if (!markerInfo) return;
+      const { marker } = markerInfo;
+      map.setView(marker.getLatLng(), 14);
+      marker.openPopup();
+}
       // Load JSON + markers
       fetch("Data/nsw_pubs.json")
   .then(response => response.json())
@@ -249,26 +308,25 @@
 
       let key = `${pubName}, ${suburb}`;
       let displayName = key;
+      pubList.push({ key, displayName });
 
       if (visited[key]?.Jana) lgaStats[lga].Jana++;
       if (visited[key]?.Brendan) lgaStats[lga].Brendan++;
 
       // Helper to generate popup content based on current visited state
-      function getPopupContent() {
-        return `
-          <b>${displayName}</b><br>
-          <label>
-            Jana <input type="checkbox"
-              ${visited[key]?.Jana ? "checked" : ""}
-              onchange="toggleVisited('Jana', '${key}', window.markers['${key}'].marker, this)">
-          </label><br>
-          <label>
-            Brendan <input type="checkbox"
-              ${visited[key]?.Brendan ? "checked" : ""}
-              onchange="toggleVisited('Brendan', '${key}', window.markers['${key}'].marker, this)">
-          </label>
-        `;
-      }
+          function getPopupContent() {
+      return `
+        <b>${displayName}</b><br>
+        <label>
+          Jana <input type="checkbox" id="jana-${btoa(key)}"
+            ${visited[key]?.Jana ? "checked" : ""}>
+        </label><br>
+        <label>
+          Brendan <input type="checkbox" id="brendan-${btoa(key)}"
+            ${visited[key]?.Brendan ? "checked" : ""}>
+        </label>
+      `;
+    }
 
       // Create marker
       let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
@@ -285,9 +343,23 @@
       marker.bindPopup(getPopupContent());
 
       // 🔥 Regenerate popup content every time it opens
-      marker.on("popupopen", function(e) {
-        e.popup.setContent(getPopupContent());
-      });
+          marker.on("popupopen", function(e) {
+      e.popup.setContent(getPopupContent());
+
+      const janaBox = document.getElementById(`jana-${btoa(key)}`);
+      const brendanBox = document.getElementById(`brendan-${btoa(key)}`);
+
+      if (janaBox) {
+        janaBox.addEventListener("change", () => {
+          toggleVisited("Jana", key, window.markers[key].marker, janaBox);
+        });
+      }
+      if (brendanBox) {
+        brendanBox.addEventListener("change", () => {
+          toggleVisited("Brendan", key, window.markers[key].marker, brendanBox);
+        });
+      }
+    });
 
       // Save marker info
       window.markers[key] = { marker, displayName, lga };
@@ -304,6 +376,7 @@
 
     updateResetButton();
     updateLgaTable();
+    setupSearch();
   });
 
       document.getElementById("resetButton").addEventListener("click", resetAll);
