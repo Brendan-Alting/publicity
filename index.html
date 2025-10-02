@@ -7,7 +7,12 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <style>
-      body { font-family: sans-serif; margin: 0; }
+      body { 
+        font-family: sans-serif; 
+        margin: 0; 
+        padding: 0; 
+        overflow-x: hidden; 
+      }
       #map {
         height: 600px;
         width: 100%;
@@ -16,22 +21,17 @@
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       }
       #counters {
-        margin: 10px 20px 10px auto;
+        margin: 10px 20px;
         padding: 15px 25px;
         background: #f9f9f9;
         border: 1px solid #ccc;
-        border-radius: 8px;
+        border-radius: 20px;
         width: fit-content;
         text-align: left;   
       }
-      #resetButton:disabled {
-        background: #ccc;
-        color: #666;
-        cursor: not-allowed;
-      }
       .person {
         display: grid;
-        grid-template-columns: auto 40px; 
+        grid-template-columns: auto 70px; 
         align-items: center;
         gap: 10px;
         margin: 5px 0;
@@ -40,7 +40,7 @@
       }
       #counters span {
         display: inline-block;
-        min-width: 50px;
+        min-width: 30px;
         text-align: center;
         background: #e0e0e0;
         padding: 2px 6px;
@@ -57,36 +57,40 @@
     </style>
   </head>
   <body>
-    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-      <div>
-        <h1>NSW Pub Checklist</h1>
-        <p style="margin-left: 20px;">how many ya been to?</p>
-        <div style="margin: 10px 20px; position: relative;">
-  <input id="searchBox" type="text" placeholder="Search pubs..." 
-         style="padding: 8px; width: 300px; border: 1px solid #ccc; border-radius: 6px;">
-  <div id="suggestions" 
-       style="background: white; border: 1px solid #ccc; max-height: 200px; overflow-y: auto; position: absolute; width: 300px; display:none; z-index:1000;">
-  </div>
-</div>
-      </div>
-      <div id="imageRow" style="display: flex; gap: 20px; align-items: center; margin-top: 30px; margin-left: 19px;">
-        <img src="Data/peace sign.jpg" style="height: 110px; border-radius: 8px;">
-        <img src="Data/KegTooheysOld.webp" style="height: 110px; border-radius: 8px;">
-        <img src="Data/backtoback.jpg" style="height: 110px; border-radius: 8px;">
-        <img src="Data/tooheys old beer.jpeg" style="height: 110px; border-radius: 8px;">
-        <img src="Data/69.jpg" style="height: 110px; border-radius: 8px;">
-      </div>
-      <div id="counters">
-        <div class="person">Jana <span id="countA">0</span></div>
-        <div class="person">Brendan <span id="countB">0</span></div>
-        <div class="person total">Total <span id="countTotal">0</span></div>
-        <button id="resetButton">Reset All</button>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+  
+  <div style="flex: 0 0 auto; margin-right: 5px;">
+    <h1 style="margin: 0 0 5px 10px;">NSW Pub Checklist</h1>
+    <p style="margin-left: 10px; margin-top: 0;">how many ya been to?</p>
+    <div style="margin: 5px 5px; position: relative;">
+      <input id="searchBox" type="text" placeholder="Search pubs..." 
+             style="padding: 8px; width: 300px; border: 1px solid #ccc; border-radius: 6px;">
+      <div id="suggestions" 
+           style="background: white; border: 1px solid #ccc; max-height: 200px; overflow-y: auto; position: absolute; width: 300px; display:none; z-index:1000;">
       </div>
     </div>
+  </div>
 
-    <div style="display: flex; margin-top: 10px;">
+  <div style="display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; margin-top: 20px;">
+    <div id="imageRow" style="display: flex; gap: 8px; align-items: center;">
+      <img src="Data/peace sign.jpg" style="height: 110px; border-radius: 5px;">
+      <img src="Data/KegTooheysOld.webp" style="height: 110px; border-radius: 5px;">
+      <img src="Data/backtoback.jpg" style="height: 110px; border-radius: 5px;">
+      <img src="Data/tooheys old beer.jpeg" style="height: 110px; border-radius: 5px;">
+      <img src="Data/69.jpg" style="height: 110px; border-radius: 5px;">
+    </div>
+
+    <div id="counters" style="margin-left: 5px;">
+      <div class="person">Jana <span id="countA">0</span></div>
+      <div class="person">Brendan <span id="countB">0</span></div>
+      <div class="person total">Total <span id="countTotal">0</span></div>
+    </div>
+  </div>
+</div>
+
+    <div style="display: flex; margin-top: 10px; flex-wrap: wrap;">
       <!-- LGA Sidebar -->
-      <div id="lgaTableContainer" style="flex: 0 0 280px; padding: 10px;">
+      <div id="lgaTableContainer" style="flex: 0 0 280px; padding: 10px; max-width: 100%;">
         <table id="lgaTable" border="1" cellpadding="5" style="border-collapse: collapse; width: 100%;">
           <thead>
             <tr>
@@ -100,7 +104,7 @@
       </div>
 
       <!-- Map -->
-      <div style="flex: 1; padding: 10px;">
+      <div style="flex: 1; padding: 10px; min-width: 300px;">
         <div id="map"></div>
       </div>
     </div>
@@ -112,7 +116,6 @@
       let lgaStats = {};
       let totalPubs = 0;
 
-      // Init counters
       Object.values(visited).forEach(record => {
         if (record.Jana) countA++;
         if (record.Brendan) countB++;
@@ -127,7 +130,7 @@
       }).addTo(map);
 
       let bounds = L.latLngBounds();
-      window.markers = {}; // ensure defined
+      window.markers = {}; 
 
       function updateMarker(marker, pubName, displayName) {
         let jana = visited[pubName]?.Jana;
@@ -185,8 +188,6 @@
 
         localStorage.setItem("visitedPubs", JSON.stringify(visited));
         updateMarker(marker, pubName, window.markers[pubName].displayName);
-
-        updateResetButton();
       }
 
       function updateLgaTable() {
@@ -210,176 +211,139 @@
         }
       }
 
-      function resetAll() {
-        if (confirm("Are you sure you want to clear all visited pubs?")) {
-          visited = {};
-          localStorage.removeItem("visitedPubs");
-          countA = countB = countTotal = 0;
+      // Search setup
+      const searchBox = document.getElementById("searchBox");
+      const suggestions = document.getElementById("suggestions");
+      let pubList = [];
 
-          document.getElementById("countA").innerText = `0/${totalPubs}`;
-          document.getElementById("countB").innerText = `0/${totalPubs}`;
-          document.getElementById("countTotal").innerText = `0/${totalPubs}`;
-
-          for (let pubName in window.markers) {
-            let { marker, displayName } = window.markers[pubName];
-            updateMarker(marker, pubName, displayName);
+      function setupSearch() {
+        searchBox.addEventListener("input", function () {
+          const query = this.value.toLowerCase();
+          suggestions.innerHTML = "";
+          if (!query) {
+            suggestions.style.display = "none";
+            return;
           }
 
-          for (let lga in lgaStats) {
-            lgaStats[lga].Jana = 0;
-            lgaStats[lga].Brendan = 0;
+          const matches = pubList.filter(p =>
+            p.displayName.toLowerCase().includes(query)
+          ).slice(0, 10);
+
+          if (matches.length === 0) {
+            suggestions.style.display = "none";
+            return;
           }
-          updateLgaTable();
-          updateResetButton();
-        }
+
+          matches.forEach(match => {
+            const div = document.createElement("div");
+            div.textContent = match.displayName;
+            div.style.padding = "5px";
+            div.style.cursor = "pointer";
+            div.addEventListener("click", () => {
+              zoomToPub(match.key);
+              suggestions.style.display = "none";
+              searchBox.value = match.displayName;
+            });
+            div.addEventListener("mouseover", () => {
+              div.style.background = "#f0f0f0";
+            });
+            div.addEventListener("mouseout", () => {
+              div.style.background = "white";
+            });
+            suggestions.appendChild(div);
+          });
+
+          suggestions.style.display = "block";
+        });
       }
 
-      function updateResetButton() {
-        const hasData = Object.keys(visited).length > 0 && (countA > 0 || countB > 0);
-        document.getElementById("resetButton").disabled = !hasData;
+      function zoomToPub(key) {
+        const markerInfo = window.markers[key];
+        if (!markerInfo) return;
+        const { marker } = markerInfo;
+        map.setView(marker.getLatLng(), 14);
+        marker.openPopup();
       }
-    const searchBox = document.getElementById("searchBox");
-    const suggestions = document.getElementById("suggestions");
-    let pubList = [];
 
-    function setupSearch() {
-      searchBox.addEventListener("input", function () {
-        const query = this.value.toLowerCase();
-        suggestions.innerHTML = "";
-    if (!query) {
-      suggestions.style.display = "none";
-      return;
-    }
-
-    // Find matches
-    const matches = pubList.filter(p =>
-      p.displayName.toLowerCase().includes(query)
-    ).slice(0, 10);
-
-    if (matches.length === 0) {
-      suggestions.style.display = "none";
-      return;
-    }
-
-    matches.forEach(match => {
-      const div = document.createElement("div");
-      div.textContent = match.displayName;
-      div.style.padding = "5px";
-      div.style.cursor = "pointer";
-      div.addEventListener("click", () => {
-        zoomToPub(match.key);
-        suggestions.style.display = "none";
-        searchBox.value = match.displayName;
-      });
-      div.addEventListener("mouseover", () => {
-        div.style.background = "#f0f0f0";
-      });
-      div.addEventListener("mouseout", () => {
-        div.style.background = "white";
-      });
-      suggestions.appendChild(div);
-    });
-
-    suggestions.style.display = "block";
-  });
-}
-
-    function zoomToPub(key) {
-      const markerInfo = window.markers[key];
-      if (!markerInfo) return;
-      const { marker } = markerInfo;
-      map.setView(marker.getLatLng(), 14);
-      marker.openPopup();
-}
       // Load JSON + markers
       fetch("Data/nsw_pubs.json")
-  .then(response => response.json())
-  .then(pubs => {
-    pubs.forEach(function(pub) {
-      let pubName = pub["Licence.name"];
-      let suburb = pub["Suburb"];
-      let lga = pub["LGA"].trim();
-      totalPubs++;
+        .then(response => response.json())
+        .then(pubs => {
+          pubs.forEach(function(pub) {
+            let pubName = pub["Licence.name"];
+            let suburb = pub["Suburb"];
+            let lga = pub["LGA"].trim();
+            totalPubs++;
 
-      if (!lgaStats[lga]) {
-        lgaStats[lga] = { total: 0, Jana: 0, Brendan: 0 };
-      }
-      lgaStats[lga].total++;
+            if (!lgaStats[lga]) {
+              lgaStats[lga] = { total: 0, Jana: 0, Brendan: 0 };
+            }
+            lgaStats[lga].total++;
 
-      let key = `${pubName}, ${suburb}`;
-      let displayName = key;
-      pubList.push({ key, displayName });
+            let key = `${pubName}, ${suburb}`;
+            let displayName = key;
+            pubList.push({ key, displayName });
 
-      if (visited[key]?.Jana) lgaStats[lga].Jana++;
-      if (visited[key]?.Brendan) lgaStats[lga].Brendan++;
+            if (visited[key]?.Jana) lgaStats[lga].Jana++;
+            if (visited[key]?.Brendan) lgaStats[lga].Brendan++;
 
-      // Helper to generate popup content based on current visited state
-          function getPopupContent() {
-      return `
-        <b>${displayName}</b><br>
-        <label>
-          Jana <input type="checkbox" id="jana-${btoa(key)}"
-            ${visited[key]?.Jana ? "checked" : ""}>
-        </label><br>
-        <label>
-          Brendan <input type="checkbox" id="brendan-${btoa(key)}"
-            ${visited[key]?.Brendan ? "checked" : ""}>
-        </label>
-      `;
-    }
+            function getPopupContent() {
+              return `
+                <b>${displayName}</b><br>
+                <label>
+                  Jana <input type="checkbox" id="jana-${btoa(key)}"
+                    ${visited[key]?.Jana ? "checked" : ""}>
+                </label><br>
+                <label>
+                  Brendan <input type="checkbox" id="brendan-${btoa(key)}"
+                    ${visited[key]?.Brendan ? "checked" : ""}>
+                </label>
+              `;
+            }
 
-      // Create marker
-      let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
-        radius: 5,
-        color: "black",
-        fillColor: "black",
-        fillOpacity: 0.8
-      }).addTo(map);
-      bounds.extend([pub.Latitude, pub.Longitude]);
+            let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
+              radius: 5,
+              color: "black",
+              fillColor: "black",
+              fillOpacity: 0.8
+            }).addTo(map);
+            bounds.extend([pub.Latitude, pub.Longitude]);
 
-      marker.bindTooltip(displayName, { permanent: false, direction: "top" });
+            marker.bindTooltip(displayName, { permanent: false, direction: "top" });
+            marker.bindPopup(getPopupContent());
 
-      // Bind popup (initial content)
-      marker.bindPopup(getPopupContent());
+            marker.on("popupopen", function(e) {
+              e.popup.setContent(getPopupContent());
 
-      // 🔥 Regenerate popup content every time it opens
-          marker.on("popupopen", function(e) {
-      e.popup.setContent(getPopupContent());
+              const janaBox = document.getElementById(`jana-${btoa(key)}`);
+              const brendanBox = document.getElementById(`brendan-${btoa(key)}`);
 
-      const janaBox = document.getElementById(`jana-${btoa(key)}`);
-      const brendanBox = document.getElementById(`brendan-${btoa(key)}`);
+              if (janaBox) {
+                janaBox.addEventListener("change", () => {
+                  toggleVisited("Jana", key, window.markers[key].marker, janaBox);
+                });
+              }
+              if (brendanBox) {
+                brendanBox.addEventListener("change", () => {
+                  toggleVisited("Brendan", key, window.markers[key].marker, brendanBox);
+                });
+              }
+            });
 
-      if (janaBox) {
-        janaBox.addEventListener("change", () => {
-          toggleVisited("Jana", key, window.markers[key].marker, janaBox);
+            window.markers[key] = { marker, displayName, lga };
+            updateMarker(marker, key, displayName);
+          });
+
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+          map.invalidateSize();
+
+          document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
+          document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
+          document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
+
+          updateLgaTable();
+          setupSearch();
         });
-      }
-      if (brendanBox) {
-        brendanBox.addEventListener("change", () => {
-          toggleVisited("Brendan", key, window.markers[key].marker, brendanBox);
-        });
-      }
-    });
-
-      // Save marker info
-      window.markers[key] = { marker, displayName, lga };
-      updateMarker(marker, key, displayName);
-    });
-
-    // Fit map + initialise counters
-    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
-    map.invalidateSize();
-
-    document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
-    document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
-    document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
-
-    updateResetButton();
-    updateLgaTable();
-    setupSearch();
-  });
-
-      document.getElementById("resetButton").addEventListener("click", resetAll);
     </script>
   </body>
 </html>
