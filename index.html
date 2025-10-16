@@ -114,18 +114,20 @@
     <script>
       // --------------- FIREBASE SETUP -----------------
       const firebaseConfig = {
-        apiKey: "AIzaSyApRi7wG8zT9j7AAI8ot2NGHHEn4khMbHY",
-        authDomain: "publicity-b5755.firebaseapp.com",
-        projectId: "publicity-b5755",
-        storageBucket: "publicity-b5755.firebasestorage.app",
-        messagingSenderId: "863893672681",
-        appId: "1:863893672681:web:cdd006cfa72862b97f1678"
-};
+    apiKey: "AIzaSyApRi7wG8zT9j7AAI8ot2NGHHEn4khMbHY",
+    authDomain: "publicity-b5755.firebaseapp.com",
+    databaseURL: "https://publicity-b5755-default-rtdb.firebaseio.com",
+    projectId: "publicity-b5755",
+    storageBucket: "publicity-b5755.firebasestorage.app",
+    messagingSenderId: "863893672681",
+    appId: "1:863893672681:web:cdd006cfa72862b97f1678"
+  };
 
       firebase.initializeApp(firebaseConfig);
       const db = firebase.database();
       const userKey = "shared"; // single shared dataset for all users
-
+      console.log("Firebase initialized:", firebase.apps.length > 0);
+      
       let visited = {};
 
       // Load data from Firebase or local backup
@@ -326,4 +328,5 @@
     </script>
   </body>
 </html>
+
 
