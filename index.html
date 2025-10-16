@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>NSW Pub/Old Checklist</title>
+    <title>NSW Pub Checklist</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -54,13 +54,31 @@
         border-radius: 8px;
         margin-top: 5px;
       }
+      #syncStatus {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        padding: 8px 12px;
+        background: #4CAF50;
+        color: white;
+        border-radius: 5px;
+        font-size: 12px;
+        z-index: 1000;
+      }
+      #syncStatus.syncing {
+        background: #FF9800;
+      }
+      #syncStatus.error {
+        background: #f44336;
+      }
     </style>
   </head>
   <body>
+    <div id="syncStatus">🔄 Connecting...</div>
 
     <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
       <div style="flex: 0 0 auto; margin-right: 5px;">
-        <h1 style="margin: 0 0 5px 10px;">NSW Pub/Old Checklist</h1>
+        <h1 style="margin: 0 0 5px 10px;">NSW Pub Checklist</h1>
         <p style="margin-left: 10px; margin-top: 0;">how many ya been to?</p>
         <div style="margin: 5px 5px; position: relative;">
           <input id="searchBox" type="text" placeholder="Search pubs..." 
@@ -107,226 +125,304 @@
       </div>
     </div>
 
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
     <script>
-      // --------------- FIREBASE SETUP -----------------
+      // Firebase configuration
       const firebaseConfig = {
-    apiKey: "AIzaSyApRi7wG8zT9j7AAI8ot2NGHHEn4khMbHY",
-    authDomain: "publicity-b5755.firebaseapp.com",
-    databaseURL: "https://publicity-b5755-default-rtdb.firebaseio.com",
-    projectId: "publicity-b5755",
-    storageBucket: "publicity-b5755.firebasestorage.app",
-    messagingSenderId: "863893672681",
-    appId: "1:863893672681:web:cdd006cfa72862b97f1678"
-  };
+        apiKey: "AIzaSyApRi7wG8zT9j7AAI8ot2NGHHEn4khMbHY",
+        authDomain: "publicity-b5755.firebaseapp.com",
+        databaseURL: "https://publicity-b5755-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "publicity-b5755",
+        storageBucket: "publicity-b5755.firebasestorage.app",
+        messagingSenderId: "863893672681",
+        appId: "1:863893672681:web:cdd006cfa72862b97f1678"
+      };
 
       firebase.initializeApp(firebaseConfig);
       const db = firebase.database();
-      const userKey = "shared"; // single shared dataset for all users
-      console.log("Firebase initialized:", firebase.apps.length > 0);
+      const visitedRef = db.ref('visited/shared');
       
       let visited = {};
+      let isInitialLoad = true;
+      let localUpdateInProgress = false;
 
-      // Load data from Firebase or local backup
-      firebase.database().ref(`visited/${userKey}`).once("value").then(snapshot => {
-        const data = snapshot.val();
-        if (data) {
-          visited = data;
-          initApp();
-        } else {
-          const local = JSON.parse(localStorage.getItem("visitedPubs"));
-          if (local) {
-            visited = local;
-            firebase.database().ref(`visited/${userKey}`).set(local);
-          }
-          initApp();
-        }
-      });
+      // Sync status indicator
+      function setSyncStatus(status, message) {
+        const indicator = document.getElementById('syncStatus');
+        indicator.className = status;
+        indicator.textContent = message;
+      }
 
-      // ------------------ MAIN APP --------------------
-      function initApp() {
-        let countA = 0, countB = 0, countTotal = 0;
-        let lgaStats = {};
-        let totalPubs = 0;
+      // Initialize the app
+      let countA = 0, countB = 0, countTotal = 0;
+      let lgaStats = {};
+      let totalPubs = 0;
+      let map, bounds, pubList = [];
+      window.markers = {};
 
+      function recalculateCounts() {
+        countA = 0;
+        countB = 0;
+        countTotal = 0;
+        
         Object.values(visited).forEach(record => {
           if (record.Jana) countA++;
           if (record.Brendan) countB++;
           if (record.Jana || record.Brendan) countTotal++;
         });
 
-        var map = L.map('map');
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-
-        let bounds = L.latLngBounds();
-        window.markers = {}; 
-        let pubList = [];
-
-        function updateMarker(marker, pubName, displayName) {
-          let jana = visited[pubName]?.Jana;
-          let brendan = visited[pubName]?.Brendan;
-          let color = "black";
-          if (jana && brendan) color = "#00b300";
-          else if (jana) color = "#4da6ff";
-          else if (brendan) color = "#ff6666";
-          marker.setStyle({ color, fillColor: color });
-          marker.bindTooltip(`${displayName}<br>${jana ? "✅ Jana" : "❌ Jana"} | ${brendan ? "✅ Brendan" : "❌ Brendan"}`);
-        }
-
-        function updateFirebase() {
-          firebase.database().ref(`visited/${userKey}`).set(visited);
-        }
-
-        function toggleVisited(person, pubName, marker, checkbox) {
-          if (!visited[pubName]) visited[pubName] = { Jana: false, Brendan: false };
-          let newState = checkbox.checked;
-          let oldState = visited[pubName][person];
-          visited[pubName][person] = newState;
-
-          if (newState && !oldState) {
-            if (person === 'Jana') countA++;
-            else countB++;
-          } else if (!newState && oldState) {
-            if (person === 'Jana') countA--;
-            else countB--;
-          }
-
-          countTotal = Object.values(visited).filter(v => v.Jana || v.Brendan).length;
-
-          let lga = window.markers[pubName].lga;
+        // Recalculate LGA stats
+        for (let lga in lgaStats) {
           lgaStats[lga].Jana = 0;
           lgaStats[lga].Brendan = 0;
-
-          for (let key in window.markers) {
-            let markerInfo = window.markers[key];
-            let v = visited[key];
-            if (!v) continue;
-            if (markerInfo.lga === lga) {
-              if (v.Jana) lgaStats[lga].Jana++;
-              if (v.Brendan) lgaStats[lga].Brendan++;
-            }
-          }
-
-          updateLgaTable();
-
-          document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
-          document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
-          document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
-
-          localStorage.setItem("visitedPubs", JSON.stringify(visited));
-          updateFirebase();
-          updateMarker(marker, pubName, window.markers[pubName].displayName);
         }
 
-        function updateLgaTable() {
-          let tbody = document.querySelector("#lgaTable tbody");
-          tbody.innerHTML = "";
-          let sorted = Object.entries(lgaStats).sort((a, b) => {
-            let totalA = a[1].Jana + a[1].Brendan;
-            let totalB = b[1].Jana + b[1].Brendan;
-            return totalB - totalA;
-          });
-          for (let [lga, stats] of sorted) {
-            let row = document.createElement("tr");
-            row.innerHTML = `<td>${lga}</td><td>${stats.Jana}/${stats.total}</td><td>${stats.Brendan}/${stats.total}</td>`;
-            tbody.appendChild(row);
-          }
+        for (let key in window.markers) {
+          let markerInfo = window.markers[key];
+          let v = visited[key];
+          if (!v) continue;
+          let lga = markerInfo.lga;
+          if (v.Jana) lgaStats[lga].Jana++;
+          if (v.Brendan) lgaStats[lga].Brendan++;
         }
 
-        const searchBox = document.getElementById("searchBox");
-        const suggestions = document.getElementById("suggestions");
-
-        function setupSearch() {
-          searchBox.addEventListener("input", function () {
-            const query = this.value.toLowerCase();
-            suggestions.innerHTML = "";
-            if (!query) { suggestions.style.display = "none"; return; }
-            const matches = pubList.filter(p => p.displayName.toLowerCase().includes(query)).slice(0, 10);
-            if (matches.length === 0) { suggestions.style.display = "none"; return; }
-            matches.forEach(match => {
-              const div = document.createElement("div");
-              div.textContent = match.displayName;
-              div.style.padding = "5px";
-              div.style.cursor = "pointer";
-              div.addEventListener("click", () => { zoomToPub(match.key); suggestions.style.display = "none"; searchBox.value = match.displayName; });
-              div.addEventListener("mouseover", () => div.style.background = "#f0f0f0");
-              div.addEventListener("mouseout", () => div.style.background = "white");
-              suggestions.appendChild(div);
-            });
-            suggestions.style.display = "block";
-          });
-        }
-
-        function zoomToPub(key) {
-          const markerInfo = window.markers[key];
-          if (!markerInfo) return;
-          map.setView(markerInfo.marker.getLatLng(), 14);
-          markerInfo.marker.openPopup();
-        }
-
-        fetch("Data/nsw_pubs.json")
-          .then(r => r.json())
-          .then(pubs => {
-            pubs.forEach(pub => {
-              let pubName = pub["Licence.name"];
-              let suburb = pub["Suburb"];
-              let lga = pub["LGA"].trim();
-              totalPubs++;
-              if (!lgaStats[lga]) lgaStats[lga] = { total: 0, Jana: 0, Brendan: 0 };
-              lgaStats[lga].total++;
-
-              let key = `${pubName}, ${suburb}`;
-              let displayName = key;
-              pubList.push({ key, displayName });
-
-              if (visited[key]?.Jana) lgaStats[lga].Jana++;
-              if (visited[key]?.Brendan) lgaStats[lga].Brendan++;
-
-              function getPopupContent() {
-                return `
-                  <b>${displayName}</b><br>
-                  <label>Jana <input type="checkbox" id="jana-${btoa(key)}" ${visited[key]?.Jana ? "checked" : ""}></label><br>
-                  <label>Brendan <input type="checkbox" id="brendan-${btoa(key)}" ${visited[key]?.Brendan ? "checked" : ""}></label>
-                `;
-              }
-
-              let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
-                radius: 5, color: "black", fillColor: "black", fillOpacity: 0.8
-              }).addTo(map);
-
-              bounds.extend([pub.Latitude, pub.Longitude]);
-              marker.bindTooltip(displayName, { permanent: false, direction: "top" });
-              marker.bindPopup(getPopupContent());
-
-              marker.on("popupopen", function(e) {
-                e.popup.setContent(getPopupContent());
-                const janaBox = document.getElementById(`jana-${btoa(key)}`);
-                const brendanBox = document.getElementById(`brendan-${btoa(key)}`);
-                if (janaBox) janaBox.addEventListener("change", () => toggleVisited("Jana", key, window.markers[key].marker, janaBox));
-                if (brendanBox) brendanBox.addEventListener("change", () => toggleVisited("Brendan", key, window.markers[key].marker, brendanBox));
-              });
-
-              window.markers[key] = { marker, displayName, lga };
-              updateMarker(marker, key, displayName);
-            });
-
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
-            map.invalidateSize();
-            document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
-            document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
-            document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
-            updateLgaTable();
-            setupSearch();
-          });
+        updateUI();
       }
+
+      function updateUI() {
+        document.getElementById("countA").innerText = `${countA}/${totalPubs}`;
+        document.getElementById("countB").innerText = `${countB}/${totalPubs}`;
+        document.getElementById("countTotal").innerText = `${countTotal}/${totalPubs}`;
+        updateLgaTable();
+        
+        // Update all markers
+        for (let key in window.markers) {
+          updateMarker(window.markers[key].marker, key, window.markers[key].displayName);
+        }
+      }
+
+      function updateMarker(marker, pubName, displayName) {
+        let jana = visited[pubName]?.Jana;
+        let brendan = visited[pubName]?.Brendan;
+        let color = "black";
+        if (jana && brendan) color = "#00b300";
+        else if (jana) color = "#4da6ff";
+        else if (brendan) color = "#ff6666";
+        marker.setStyle({ color, fillColor: color });
+        
+        let janaStatus = jana ? "✅ Jana" : "❌ Jana";
+        let brendanStatus = brendan ? "✅ Brendan" : "❌ Brendan";
+        marker.bindTooltip(`${displayName}<br>${janaStatus} | ${brendanStatus}`, { 
+          permanent: false, 
+          direction: "top" 
+        });
+      }
+
+      function toggleVisited(person, pubName, marker, checkbox) {
+        localUpdateInProgress = true;
+        setSyncStatus('syncing', '🔄 Syncing...');
+        
+        if (!visited[pubName]) {
+          visited[pubName] = { Jana: false, Brendan: false };
+        }
+        
+        visited[pubName][person] = checkbox.checked;
+        
+        // Update Firebase
+        visitedRef.child(pubName).set(visited[pubName])
+          .then(() => {
+            setSyncStatus('', '✅ Synced');
+            setTimeout(() => setSyncStatus('', ''), 2000);
+            localUpdateInProgress = false;
+          })
+          .catch(err => {
+            console.error('Firebase update error:', err);
+            setSyncStatus('error', '❌ Sync failed');
+            localUpdateInProgress = false;
+          });
+        
+        recalculateCounts();
+      }
+
+      function updateLgaTable() {
+        let tbody = document.querySelector("#lgaTable tbody");
+        tbody.innerHTML = "";
+        let sorted = Object.entries(lgaStats).sort((a, b) => {
+          let totalA = a[1].Jana + a[1].Brendan;
+          let totalB = b[1].Jana + b[1].Brendan;
+          return totalB - totalA;
+        });
+        for (let [lga, stats] of sorted) {
+          let row = document.createElement("tr");
+          row.innerHTML = `<td>${lga}</td><td>${stats.Jana}/${stats.total}</td><td>${stats.Brendan}/${stats.total}</td>`;
+          tbody.appendChild(row);
+        }
+      }
+
+      // Setup search functionality
+      const searchBox = document.getElementById("searchBox");
+      const suggestions = document.getElementById("suggestions");
+
+      function setupSearch() {
+        searchBox.addEventListener("input", function () {
+          const query = this.value.toLowerCase();
+          suggestions.innerHTML = "";
+          if (!query) { 
+            suggestions.style.display = "none"; 
+            return; 
+          }
+          const matches = pubList.filter(p => p.displayName.toLowerCase().includes(query)).slice(0, 10);
+          if (matches.length === 0) { 
+            suggestions.style.display = "none"; 
+            return; 
+          }
+          matches.forEach(match => {
+            const div = document.createElement("div");
+            div.textContent = match.displayName;
+            div.style.padding = "5px";
+            div.style.cursor = "pointer";
+            div.addEventListener("click", () => { 
+              zoomToPub(match.key); 
+              suggestions.style.display = "none"; 
+              searchBox.value = match.displayName; 
+            });
+            div.addEventListener("mouseover", () => div.style.background = "#f0f0f0");
+            div.addEventListener("mouseout", () => div.style.background = "white");
+            suggestions.appendChild(div);
+          });
+          suggestions.style.display = "block";
+        });
+      }
+
+      function zoomToPub(key) {
+        const markerInfo = window.markers[key];
+        if (!markerInfo) return;
+        map.setView(markerInfo.marker.getLatLng(), 14);
+        markerInfo.marker.openPopup();
+      }
+
+      // Initialize Firebase listener first
+      visitedRef.on('value', (snapshot) => {
+        if (localUpdateInProgress) return; // Skip updates triggered by local changes
+        
+        const firebaseData = snapshot.val() || {};
+        
+        if (isInitialLoad) {
+          // On first load, merge localStorage with Firebase
+          const localStorage = JSON.parse(window.localStorage.getItem("visitedPubs")) || {};
+          
+          // Merge: Firebase takes precedence, but include any local-only data
+          visited = { ...localStorage, ...firebaseData };
+          
+          // If we had local data that wasn't in Firebase, push it
+          if (Object.keys(localStorage).length > 0) {
+            visitedRef.set(visited);
+          }
+          
+          isInitialLoad = false;
+          setSyncStatus('', '✅ Connected');
+        } else {
+          // Subsequent updates from other devices
+          visited = firebaseData;
+          recalculateCounts();
+          setSyncStatus('', '🔄 Updated from server');
+          setTimeout(() => setSyncStatus('', ''), 2000);
+        }
+        
+        // Always backup to localStorage
+        window.localStorage.setItem("visitedPubs", JSON.stringify(visited));
+      });
+
+      // Load pubs and create map
+      map = L.map('map');
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      bounds = L.latLngBounds();
+
+      fetch("Data/nsw_pubs.json")
+        .then(r => r.json())
+        .then(pubs => {
+          pubs.forEach(pub => {
+            let pubName = pub["Licence.name"];
+            let suburb = pub["Suburb"];
+            let lga = pub["LGA"].trim();
+            totalPubs++;
+            
+            if (!lgaStats[lga]) {
+              lgaStats[lga] = { total: 0, Jana: 0, Brendan: 0 };
+            }
+            lgaStats[lga].total++;
+
+            let key = `${pubName}, ${suburb}`;
+            let displayName = key;
+            pubList.push({ key, displayName });
+
+            if (visited[key]?.Jana) lgaStats[lga].Jana++;
+            if (visited[key]?.Brendan) lgaStats[lga].Brendan++;
+
+            function getPopupContent() {
+              return `
+                <b>${displayName}</b><br>
+                <label>Jana <input type="checkbox" id="jana-${btoa(key)}" ${visited[key]?.Jana ? "checked" : ""}></label><br>
+                <label>Brendan <input type="checkbox" id="brendan-${btoa(key)}" ${visited[key]?.Brendan ? "checked" : ""}></label>
+              `;
+            }
+
+            let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
+              radius: 5, 
+              color: "black", 
+              fillColor: "black", 
+              fillOpacity: 0.8
+            }).addTo(map);
+
+            bounds.extend([pub.Latitude, pub.Longitude]);
+            marker.bindTooltip(displayName, { permanent: false, direction: "top" });
+            marker.bindPopup(getPopupContent());
+
+            marker.on("popupopen", function(e) {
+              e.popup.setContent(getPopupContent());
+              const janaBox = document.getElementById(`jana-${btoa(key)}`);
+              const brendanBox = document.getElementById(`brendan-${btoa(key)}`);
+              if (janaBox) {
+                janaBox.addEventListener("change", () => {
+                  toggleVisited("Jana", key, window.markers[key].marker, janaBox);
+                });
+              }
+              if (brendanBox) {
+                brendanBox.addEventListener("change", () => {
+                  toggleVisited("Brendan", key, window.markers[key].marker, brendanBox);
+                });
+              }
+            });
+
+            window.markers[key] = { marker, displayName, lga };
+            updateMarker(marker, key, displayName);
+          });
+
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+          map.invalidateSize();
+          
+          recalculateCounts();
+          setupSearch();
+        })
+        .catch(err => {
+          console.error('Error loading pubs:', err);
+          setSyncStatus('error', '❌ Failed to load pubs');
+        });
+
+      // Handle connection status
+      db.ref('.info/connected').on('value', (snapshot) => {
+        if (snapshot.val() === true) {
+          setSyncStatus('', '✅ Connected');
+        } else {
+          setSyncStatus('error', '❌ Offline');
+        }
+      });
     </script>
   </body>
 </html>
-
-
