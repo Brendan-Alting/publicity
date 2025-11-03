@@ -147,6 +147,7 @@
       let visited = {};
       let isInitialLoad = true;
       let localUpdateInProgress = false;
+      let dataLoaded = { firebase: false, pubs: false };
 
       // Sync status indicator
       function setSyncStatus(status, message) {
@@ -303,6 +304,13 @@
         markerInfo.marker.openPopup();
       }
 
+      // Check if both data sources are loaded and trigger calculation
+      function checkDataLoaded() {
+        if (dataLoaded.firebase && dataLoaded.pubs) {
+          recalculateCounts();
+        }
+      }
+
       // Initialize Firebase listener first
       visitedRef.on('value', (snapshot) => {
         if (localUpdateInProgress) return; // Skip updates triggered by local changes
@@ -322,7 +330,9 @@
           }
           
           isInitialLoad = false;
+          dataLoaded.firebase = true;
           setSyncStatus('', '✅ Connected');
+          checkDataLoaded(); // Trigger calculation if pubs are also loaded
         } else {
           // Subsequent updates from other devices
           visited = firebaseData;
@@ -373,11 +383,13 @@
               `;
             }
 
+            // Increased radius for better mobile touch targets
             let marker = L.circleMarker([pub.Latitude, pub.Longitude], {
-              radius: 5, 
+              radius: 8, 
               color: "black", 
               fillColor: "black", 
-              fillOpacity: 0.8
+              fillOpacity: 0.8,
+              weight: 2
             }).addTo(map);
 
             bounds.extend([pub.Latitude, pub.Longitude]);
@@ -407,7 +419,8 @@
           map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
           map.invalidateSize();
           
-          recalculateCounts();
+          dataLoaded.pubs = true;
+          checkDataLoaded(); // Trigger calculation if Firebase is also loaded
           setupSearch();
         })
         .catch(err => {
