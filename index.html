@@ -205,35 +205,38 @@
       }
 
       function updateMarker(marker, pubName, displayName) {
-        let jana = visited[pubName]?.Jana;
-        let brendan = visited[pubName]?.Brendan;
-        let color = "black";
-        let zIndex = 100;
-        if (jana && brendan) { color = "#00b300";
-          zIndex = 400;
-      } else if (jana) {color = "#4da6ff";
-          zIndex = 200;
-       } else if (brendan) { color = "#ff6666";
-          zIndex = 300;
-        } 
-        marker.setStyle({ 
+  let jana = visited[pubName]?.Jana;
+  let brendan = visited[pubName]?.Brendan;
+  let color = "black";
+  let zIndex = 100;
+  
+  if (jana && brendan) {
+    color = "#00b300";
+    zIndex = 400;
+  } else if (jana) {
+    color = "#4da6ff";
+    zIndex = 300;
+  } else if (brendan) {
+    color = "#ff6666";
+    zIndex = 200;
+  }
+  
+  marker.setStyle({ 
     color, 
     fillColor: color,
     fillOpacity: 0.8,
     opacity: 0.9,
     weight: 2
   });
-        marker.setZIndexOffset(zIndex);
-
-        
-        let janaStatus = jana ? "✅ Jana" : "❌ Jana";
-        let brendanStatus = brendan ? "✅ Brendan" : "❌ Brendan";
-        marker.bindTooltip(`${displayName}<br>${janaStatus} | ${brendanStatus}`, { 
-          permanent: false, 
-          direction: "top" 
-        });
-      }
-
+  marker.setZIndexOffset(zIndex);
+  
+  let janaStatus = jana ? "✅ Jana" : "❌ Jana";
+  let brendanStatus = brendan ? "✅ Brendan" : "❌ Brendan";
+  marker.bindTooltip(`${displayName}<br>${janaStatus} | ${brendanStatus}`, { 
+    permanent: false, 
+    direction: "top" 
+  });
+}
       function toggleVisited(person, pubName, marker, checkbox) {
         localUpdateInProgress = true;
         setSyncStatus('syncing', '🔄 Syncing...');
@@ -452,6 +455,7 @@
     </script>
   </body>
 </html>
+
 
 
 
