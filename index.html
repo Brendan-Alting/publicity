@@ -209,26 +209,11 @@
   let brendan = visited[pubName]?.Brendan;
   let color = "black";
   
-  if (jana && brendan) {
-    color = "#00b300";
-  } else if (jana) {
-    color = "#4da6ff";
-  } else if (brendan) {
-    color = "#ff6666";
-  }
+  if (jana && brendan) color = "#00b300";
+  else if (jana) color = "#4da6ff";
+  else if (brendan) color = "#ff6666";
   
-  marker.setStyle({ 
-    color, 
-    fillColor: color,
-    fillOpacity: 0.8,
-    opacity: 0.9,
-    weight: 2
-  });
-  
-  // For circle markers, bring to front based on priority
-  if (jana || brendan) {
-    marker.bringToFront();
-  }
+  marker.setStyle({ color, fillColor: color });
   
   let janaStatus = jana ? "✅ Jana" : "❌ Jana";
   let brendanStatus = brendan ? "✅ Brendan" : "❌ Brendan";
@@ -447,6 +432,7 @@
     </script>
   </body>
 </html>
+
 
 
 
