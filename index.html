@@ -214,6 +214,10 @@
   else if (brendan) color = "#ff6666";
   
   marker.setStyle({ color, fillColor: color });
+
+  if (jana || brendan) {
+  marker.bringToFront();
+  }
   
   let janaStatus = jana ? "✅ Jana" : "❌ Jana";
   let brendanStatus = brendan ? "✅ Brendan" : "❌ Brendan";
@@ -432,6 +436,7 @@
     </script>
   </body>
 </html>
+
 
 
 
