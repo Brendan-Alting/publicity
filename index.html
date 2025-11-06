@@ -204,43 +204,38 @@
         }
       }
 
-      function updateMarker(marker, pubName, displayName) {
+        function updateMarker(marker, pubName, displayName) {
   let jana = visited[pubName]?.Jana;
   let brendan = visited[pubName]?.Brendan;
-
   let color = "black";
-  let pane = "markerPane";
-
-  // Marker colouring rules
+  
   if (jana && brendan) {
-    color = "#00b300";      // both visited
-    pane = "paneBoth";
+    color = "#00b300";
   } else if (jana) {
-    color = "#4da6ff";      // Jana visited
-    pane = "paneJana";
+    color = "#4da6ff";
   } else if (brendan) {
-    color = "#ff6666";      // Brendan visited
-    pane = "paneBrendan";
+    color = "#ff6666";
   }
-
-  marker.setStyle({
-    color,
+  
+  marker.setStyle({ 
+    color, 
     fillColor: color,
     fillOpacity: 0.8,
     opacity: 0.9,
     weight: 2
   });
-
-  marker.options.pane = pane;
-  marker.bringToFront();
-
+  
+  // For circle markers, bring to front based on priority
+  if (jana || brendan) {
+    marker.bringToFront();
+  }
+  
   let janaStatus = jana ? "✅ Jana" : "❌ Jana";
   let brendanStatus = brendan ? "✅ Brendan" : "❌ Brendan";
-
-  marker.bindTooltip(
-    `${displayName}<br>${janaStatus} | ${brendanStatus}`,
-    { permanent: false, direction: "top" }
-  );
+  marker.bindTooltip(`${displayName}<br>${janaStatus} | ${brendanStatus}`, { 
+    permanent: false, 
+    direction: "top" 
+  });
 }
       function toggleVisited(person, pubName, marker, checkbox) {
         localUpdateInProgress = true;
@@ -360,14 +355,6 @@
 
       // Load pubs and create map
       map = L.map('map');
-      map.createPane("paneJana");
-map.createPane("paneBrendan");
-map.createPane("paneBoth");
-
-map.getPane("paneJana").style.zIndex = 300;
-map.getPane("paneBrendan").style.zIndex = 200;
-map.getPane("paneBoth").style.zIndex = 400;
-      
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors'
@@ -460,6 +447,7 @@ map.getPane("paneBoth").style.zIndex = 400;
     </script>
   </body>
 </html>
+
 
 
 
